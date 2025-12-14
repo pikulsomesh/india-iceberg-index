@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Input PDF files (too large for git)
+*.pdf
+
+# Output files (generated)
+*.csv
+
+# Jupyter notebooks
+.ipynb_checkpoints/
