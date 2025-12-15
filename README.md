@@ -19,7 +19,7 @@ We achieve this by combining:
 ### Technical Paper
 For a deep dive into the methodology, data sources, and full economic analysis, please refer to the technical paper included in this repository:
 
-📄 **[Read the Technical Paper (I3-Technical)] (I3-Technical.pdf)**
+📄 **Read the [Technical Paper](https://github.com/pikulsomesh/india-iceberg-index/blob/main/I3-Technical.pdf)**
 
 ## Streamlit Application
 
@@ -37,7 +37,8 @@ The application code in this repository powers the interactive dashboard, allowi
     ```
 
 ## Author
-**Somesh Mohapatra**
-*PhD in AI (MIT) | MBA in Operations (MIT Sloan)*
+**Somesh Mohapatra, PhD, MBA**
+
+Somesh Mohapatra is an independent researcher specializing in artificial intelligence and its implications in different sectors. Recently, he has been focused on measuring AI-driven occupational risks such as the Indian Iceberg Index for automation exposure across districts and sectors. He holds a PhD in Artificial Intelligence and an MBA, both from the Massachusetts Institute of Technology, and is a Gold Medalist from the Indian Institute of Technology Roorkee. His professional experience spans industry and research, including leadership roles in AI, analytics, and digital transformation at Caterpillar Inc., and prior research work at Google, Amgen Inc, alongside co-founding an AI startup serving manufacturing clients in India and the United States.
 
 *Disclaimer: This is a personal research project.*
