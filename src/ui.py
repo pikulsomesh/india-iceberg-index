@@ -86,18 +86,42 @@ def render_map(df, geojson):
             row = df[df['District_Name'] == selected_dist].iloc[0]
             st.write(f"**District:** {selected_dist}")
             st.write(f"**State:** {row['State_Name']}")
-            col_d1, col_d2 = st.columns(2)
-            col_d1.metric("Iceberg Index", f"{row['iceberg_index']:.2f}")
-            if 'Population' in row and pd.notna(row['Population']):
-                col_d2.metric("Population", f"{int(row['Population']):,}")
-            else:
-                col_d2.metric("Type", row.get('Type', 'Unknown'))
+            st.metric("Iceberg Index", f"{row['iceberg_index']:.2f}")
                 
     with tab2:
         st.subheader("State-Level Aggregation")
-        state_agg = df.groupby('State_Name')['iceberg_index'].agg(['mean', 'std']).reset_index().sort_values('mean', ascending=False)
+        
+        # Comprehensive Aggregation
+        agg_cols = {
+            'iceberg_index': ['mean', 'std', 'min', 'max'],
+            'surface_index': ['mean', 'std', 'min', 'max'],
+            'surprise_index': ['mean', 'std', 'min', 'max'],
+            'District_Name': 'count'
+        }
+        
+        state_agg = df.groupby('State_Name').agg(agg_cols).reset_index()
+        
+        # Flatten MultiIndex Columns
+        state_agg.columns = [
+            'State/UT',
+            'Iceberg Mean', 'Iceberg SD', 'Iceberg Min', 'Iceberg Max',
+            'Surface Mean', 'Surface SD', 'Surface Min', 'Surface Max',
+            'Surprise Mean', 'Surprise SD', 'Surprise Min', 'Surprise Max',
+            'Districts (n)'
+        ]
+        
+        # Reorder columns to match Appendix style: State, n, Iceberg stats, Surface stats, Surprise stats
+        cols_order = ['State/UT', 'Districts (n)', 
+                      'Iceberg Mean', 'Iceberg SD', 'Iceberg Min', 'Iceberg Max',
+                      'Surface Mean', 'Surface SD', 'Surface Min', 'Surface Max',
+                      'Surprise Mean', 'Surprise SD', 'Surprise Min', 'Surprise Max']
+        
+        state_agg = state_agg[cols_order].sort_values('Iceberg Mean', ascending=False)
+        
+        # Styling
         st.dataframe(
-            state_agg.rename(columns={'mean': 'Mean Iceberg Index', 'std': 'Std Dev'}).style.background_gradient(cmap='viridis', subset=['Mean Iceberg Index']),
+            state_agg.style.format(precision=2, na_rep="---")
+                     .background_gradient(cmap='viridis', subset=['Iceberg Mean', 'Surface Mean', 'Surprise Mean']),
             use_container_width=True,
             hide_index=True
         )
