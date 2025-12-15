@@ -95,9 +95,9 @@ def render_map(df, geojson):
                 
     with tab2:
         st.subheader("State-Level Aggregation")
-        state_agg = df.groupby('State_Name')['iceberg_index'].mean().reset_index().sort_values('iceberg_index', ascending=False)
+        state_agg = df.groupby('State_Name')['iceberg_index'].agg(['mean', 'std']).reset_index().sort_values('mean', ascending=False)
         st.dataframe(
-            state_agg.rename(columns={'iceberg_index': 'Mean Iceberg Index'}).style.background_gradient(cmap='viridis'),
+            state_agg.rename(columns={'mean': 'Mean Iceberg Index', 'std': 'Std Dev'}).style.background_gradient(cmap='viridis', subset=['Mean Iceberg Index']),
             use_container_width=True,
             hide_index=True
         )
