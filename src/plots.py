@@ -14,7 +14,18 @@ def plot_histogram(df, col, title, color_seq):
     fig.update_layout(showlegend=False, xaxis_title=title, yaxis_title="Number of Districts")
     return fig
 
-def plot_scatter(df, x_col, y_col, size_col, color_col, hover_data):
+def plot_scatter(df, x_col, y_col, size_col, color_col, hover_data, labels=None):
+    # Auto-generate Title Case labels if not provided
+    if labels is None:
+        labels = {}
+        for col in [x_col, y_col, size_col, color_col]:
+            labels[col] = col.replace('_', ' ').title()
+            
+    # Create Title
+    x_name = labels.get(x_col, x_col.replace('_', ' ').title())
+    y_name = labels.get(y_col, y_col.replace('_', ' ').title())
+    title_text = f"{y_name} Vs {x_name}"
+
     fig = px.scatter(
         df,
         x=x_col,
@@ -22,60 +33,54 @@ def plot_scatter(df, x_col, y_col, size_col, color_col, hover_data):
         size=size_col,
         color=color_col,
         hover_data=hover_data,
-        title=f"{y_col} vs {x_col}",
-        color_continuous_scale="RdYlGn_r" # High iceberg index is usually "risk", so Red? Or Blue? Let's use Red for high exposure.
+        labels=labels,
+        title=title_text,
+        color_continuous_scale="RdYlGn_r", # High iceberg index is usually "risk", so Red? Or Blue? Let's use Red for high exposure.
+        trendline="ols"
     )
     return fig
 
-def create_map(df):
+def create_choropleth(df, geojson):
     """
-    Create a PyDeck map for Indian Districts.
+    Create a Plotly Choropleth Mapbox for Indian Districts.
     """
-    # Filter out rows without lat/long
-    map_df = df.dropna(subset=['Latitude', 'Longitude']).copy()
-    
-    if len(map_df) == 0:
+    if geojson is None:
         return None
 
-    # Normalize Size for visualization
-    map_df['radius'] = map_df['total_employment'] / map_df['total_employment'].max() * 50000 + 5000
-
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        map_df,
-        pickable=True,
-        opacity=0.6,
-        stroked=True,
-        filled=True,
-        radius_scale=1,
-        radius_min_pixels=3,
-        radius_max_pixels=50,
-        line_width_min_pixels=1,
-        get_position=["Longitude", "Latitude"],
-        get_radius="radius",
-        get_fill_color="[255, (1 - iceberg_index / 100) * 255, 0]", # Red to Yellow/Green gradient logic roughly
-        get_line_color=[0, 0, 0],
+    # Ensure df has matching column for GeoJSON feature id
+    # Our GeoJSON feature properties have 'District'
+    # The DF has 'District_Name'
+    
+    fig = px.choropleth_mapbox(
+        df,
+        geojson=geojson,
+        locations='District_Name', # Column in DF
+        featureidkey='properties.District', # Key in GeoJSON
+        color='iceberg_index',
+        color_continuous_scale="Reds", # High exposure = Red
+        range_color=(20, 60),
+        mapbox_style="carto-positron",
+        zoom=3.5,
+        center = {"lat": 22.0, "lon": 80.0},
+        opacity=0.7,
+        labels={'iceberg_index': 'Iceberg Index', 'District_Name': 'District'},
+        hover_data={
+            'District_Name': True, # Explicitly show name
+            'State_Name': True,
+            'iceberg_index': ':.2f',
+            'total_employment': ':.0f'
+        }
     )
-
-    # Tooltip
-    tooltip = {
-        "html": "<b>{District_Name}</b>, {State_Name}<br/>"
-                "Iceberg Index: <b>{iceberg_index}</b><br/>"
-                "Employment: {total_employment}",
-        "style": {"backgroundColor": "steelblue", "color": "white"}
-    }
-
-    view_state = pdk.ViewState(
-        latitude=20.5937,
-        longitude=78.9629,
-        zoom=4,
-        pitch=0,
+    
+    fig.update_layout(
+        margin={"r":0,"t":0,"l":0,"b":0},
+        coloraxis_colorbar=dict(
+            title="Iceberg Index",
+            thicknessmode="pixels", thickness=15,
+            lenmode="pixels", len=200,
+            yanchor="top", y=1,
+            xanchor="left", x=0
+        )
     )
-
-    r = pdk.Deck(
-        layers=[layer],
-        initial_view_state=view_state,
-        tooltip=tooltip,
-        map_style="mapbox://styles/mapbox/light-v10"
-    )
-    return r
+    
+    return fig

@@ -1,5 +1,5 @@
 import streamlit as st
-from src.data import load_data
+from src.data import load_data, load_geojson
 from src.ui import render_dashboard, render_map, render_analysis, render_documentation
 
 st.set_page_config(
@@ -10,12 +10,12 @@ st.set_page_config(
 )
 
 def main():
-    st.sidebar.title("🧊 Iceberg Index India")
+    st.sidebar.title("🧊 India Iceberg Index")
     st.sidebar.markdown("---")
     
     page = st.sidebar.radio(
         "Navigation",
-        ["Dashboard", "Geographic Analysis", "Deep Dive", "Methodology"]
+        ["Dashboard", "Geographic Analysis", "Socio Economic Analysis", "Methodology"]
     )
     
     st.sidebar.markdown("---")
@@ -38,6 +38,7 @@ def main():
     with st.spinner("Loading data..."):
         try:
             df, summary_stats = load_data()
+            geojson = load_geojson()
         except Exception as e:
             st.error(f"Error loading data: {e}")
             return
@@ -45,8 +46,8 @@ def main():
     if page == "Dashboard":
         render_dashboard(df, summary_stats)
     elif page == "Geographic Analysis":
-        render_map(df)
-    elif page == "Deep Dive":
+        render_map(df, geojson)
+    elif page == "Socio Economic Analysis":
         render_analysis(df)
     elif page == "Methodology":
         render_documentation()

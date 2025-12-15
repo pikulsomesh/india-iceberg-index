@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-from src.plots import plot_histogram, plot_scatter, create_map
+from src.plots import plot_histogram, plot_scatter, create_choropleth
 
 def render_dashboard(df, stats):
     """Render the main dashboard."""
-    st.header("🇮🇳 India Iceberg Index Dashboard")
+    st.header("🇮🇳 India Iceberg Index")
     
     # Top Metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -17,6 +17,12 @@ def render_dashboard(df, stats):
     col4.metric("Surprise Index", f"{stats['avg_surprise_index']:.1f}",
                 help="Difference between Iceberg and Surface indices (Hidden Exposure)")
 
+    st.markdown("---")
+    
+    st.info(
+        f"Based on the analysis, the **National Mean Iceberg Index is {stats['national_iceberg_index']:.1f}**. "
+        "This metric represents the percentage of occupational tasks (weighted by wages) that are susceptible to AI automation across the Indian workforce."
+    )
     st.markdown("---")
 
     # Distribution
@@ -32,60 +38,141 @@ def render_dashboard(df, stats):
         st.write("Top 10 Districts by Exposure")
         st.dataframe(top_districts, hide_index=True)
 
-    st.markdown("### % of Jobs to be Automated")
-    st.info(
-        f"Based on the analysis, the **National Mean Iceberg Index is {stats['national_iceberg_index']:.1f}**. "
-        "This metric represents the percentage of occupational tasks (weighted by wages) that are susceptible to AI automation across the Indian workforce."
-    )
 
-def render_map(df):
+
+    # --- Explore Further ---
+    st.markdown("### Explore Further")
+    col_a, col_b, col_c = st.columns(3)
+    
+    with col_a:
+        st.subheader("🗺️ Geographic Analysis")
+        st.write("Explore the **Interactive Map** to see how AI exposure varies across India's districts. Hover over specific regions to see detailed Iceberg Indices.")
+
+    with col_b:
+        st.subheader("📊 Socio Economic Analysis")
+        st.write("Understand the drivers of AI exposure. This section correlates the Iceberg Index with key indicators like **Urbanization**, **Literacy**, and **Internet Access**.")
+
+    with col_c:
+        st.subheader("📚 Methodology")
+        st.write("Learn how the index was constructed. Adapts the **Felten et al. (2023)** methodology using Indian NCO codes, PLFS 2024 workforce data, and spatial backfilling techniques.")
+
+def render_map(df, geojson):
     """Render the geographic analysis map."""
     st.header("🗺️ Geographic Exposure Map")
     
-    st.markdown("Bubble size represents **Employment Magnitude**. Color represents **Iceberg Index** (Red = Higher Exposure).")
+    # 1. Interactive Choropleth Map (Single Map)
+    st.subheader("Interactive District-Level Map")
+    st.markdown("Color represents **Iceberg Index**. Hover for details.")
     
-    map_chart = create_map(df)
+    map_chart = create_choropleth(df, geojson)
     if map_chart:
-        st.pydeck_chart(map_chart)
+        st.plotly_chart(map_chart, use_container_width=True)
     else:
-        st.warning("Geographic data (Lat/Long) not available for mapping.")
-
-    # State Level Table
-    st.subheader("State-Level Aggregates")
-    state_df = df.groupby('State_Name').agg({
-        'iceberg_index': 'mean',
-        'total_employment': 'sum',
-        'District_Name': 'count'
-    }).rename(columns={'District_Name': 'District_Count'}).reset_index().sort_values('iceberg_index', ascending=False)
+        st.error("Could not load map data.")
     
-    st.dataframe(state_df, use_container_width=True)
+    st.markdown("---")
+    
+    # 2. Census Correlations
+    # Data Explorer (Moved from Dashboard)
+    st.subheader("🔍 Data Explorer")
+    tab1, tab2 = st.tabs(["Search by District", "State Aggregation"])
+    
+    with tab1:
+        st.subheader("Search District")
+        districts = sorted(df['District_Name'].unique())
+        selected_dist = st.selectbox("Select District", districts)
+        
+        if selected_dist:
+            row = df[df['District_Name'] == selected_dist].iloc[0]
+            st.write(f"**District:** {selected_dist}")
+            st.write(f"**State:** {row['State_Name']}")
+            col_d1, col_d2 = st.columns(2)
+            col_d1.metric("Iceberg Index", f"{row['iceberg_index']:.2f}")
+            if 'Population' in row and pd.notna(row['Population']):
+                col_d2.metric("Population", f"{int(row['Population']):,}")
+            else:
+                col_d2.metric("Type", row.get('Type', 'Unknown'))
+                
+    with tab2:
+        st.subheader("State-Level Aggregation")
+        state_agg = df.groupby('State_Name')['iceberg_index'].mean().reset_index().sort_values('iceberg_index', ascending=False)
+        st.dataframe(
+            state_agg.rename(columns={'iceberg_index': 'Mean Iceberg Index'}).style.background_gradient(cmap='viridis'),
+            use_container_width=True,
+            hide_index=True
+        )
 
 def render_analysis(df):
-    """Render deep dive analysis."""
-    st.header("📊 Deep Dive Analysis")
+    """Render socio-economic analysis."""
+    st.header("📊 Socio Economic Analysis")
     
-    col1, col2 = st.columns(2)
+    # --- Filter ---
+    states = sorted(df['State_Name'].unique())
+    selected_states = st.multiselect("Filter by State", states, placeholder="Select states to filter analysis (default: All)")
+    
+    if selected_states:
+        plot_df = df[df['State_Name'].isin(selected_states)]
+    else:
+        plot_df = df
+        
+    st.markdown("---")
+    
+    # --- Layout: 1 Row, 3 Columns ---
+    col1, col2, col3 = st.columns(3)
+    
+    # Common Hover Data
+    hover_cols = ['District_Name', 'State_Name']
     
     with col1:
-        st.plotly_chart(plot_scatter(df, "urban_pct", "iceberg_index", "total_employment", "iceberg_index", 
-                                     ['District_Name', 'State_Name']), use_container_width=True)
-        st.markdown("**Urbanization vs AI Exposure**: More urbanized districts tend to have higher exposure due to concentration of white-collar service jobs.")
+        st.subheader("Urbanization")
+        # Explicit labels for nice Title Case
+        labels_urban = {'urban_pct': 'Urban Percentage (%)', 'iceberg_index': 'Iceberg Index', 'total_employment': 'Employment Size'}
+        st.plotly_chart(
+            plot_scatter(plot_df, "urban_pct", "iceberg_index", "total_employment", "iceberg_index", 
+                         hover_cols, labels=labels_urban), 
+            use_container_width=True
+        )
+        st.markdown("**Trend:** Higher urbanization correlates with higher AI exposure.")
 
     with col2:
-        if 'literacy_rate' in df.columns and df['literacy_rate'].notna().sum() > 0:
-            st.plotly_chart(plot_scatter(df, "literacy_rate", "iceberg_index", "total_employment", "iceberg_index",
-                                         ['District_Name', 'State_Name']), use_container_width=True)
-            st.markdown("**Literacy vs AI Exposure**: Correlation between education levels and exposure.")
+        st.subheader("Literacy")
+        if 'literacy_rate' in plot_df.columns and plot_df['literacy_rate'].notna().sum() > 0:
+            labels_lit = {'literacy_rate': 'Literacy Rate (%)', 'iceberg_index': 'Iceberg Index', 'total_employment': 'Employment Size'}
+            st.plotly_chart(
+                plot_scatter(plot_df, "literacy_rate", "iceberg_index", "total_employment", "iceberg_index",
+                             hover_cols, labels=labels_lit), 
+                use_container_width=True
+            )
+            st.markdown("**Trend:** Education levels show positive correlation with exposure.")
         else:
-            st.info("Literacy data not available for correlation analysis.")
+            st.info("Literacy data not available.")
+
+    with col3:
+        st.subheader("Internet Access")
+        if 'Households_with_Internet' in plot_df.columns:
+             labels_net = {'Households_with_Internet': 'Internet Households (%)', 'iceberg_index': 'Iceberg Index', 'total_employment': 'Employment Size'}
+             st.plotly_chart(
+                plot_scatter(plot_df, "Households_with_Internet", "iceberg_index", "total_employment", "iceberg_index",
+                             hover_cols, labels=labels_net), 
+                use_container_width=True
+             )
+             st.markdown("**Trend:** Digital access strongly tracks with automability.")
+        else:
+            st.info("Internet data not available.")
 
 def render_documentation():
     """Render documentation from markdown file."""
-    st.header("📚 Methodology & Documentation")
+    st.header("📚 Methodology")
     
-    try:
-        with open("methodology.md", "r") as f:
-            content = f.read()
-            st.markdown(content)
-    except FileNotFoundError:
-        st.error("Documentation file not found.")
+    st.image("images/pipeline.png", caption="Iceberg Index Generation Pipeline", use_container_width=True)
+    
+    st.markdown("""
+    ### Methodology Highlights
+    The Iceberg Index methodology adapts the process developed by Felten et al. (2023) for the Indian context:
+    
+    1.  **AI Occupational Exposure (AIOE):** Generated using the mapping between Indian NCO codes and ONet codes.
+    2.  **District Aggregation:** Applied district-level industry/workforce composition from PLFS 2024 to calculate the weighted average exposure.
+    3.  **Spatial Analysis:** Backfilled missing geometries using nearest-neighbor interpolation to provide 100% map coverage.
+    
+    For full technical details, please refer to the [Technical Paper on GitHub](https://github.com/pikulsomesh/india-iceberg-index/blob/main/I3-Technical.pdf).
+    """)

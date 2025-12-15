@@ -2,49 +2,71 @@ import pandas as pd
 import numpy as np
 import os
 
-ICEBERG_PATH = "data/district_iceberg_indices.csv"
+ICEBERG_PATH = "data/district_iceberg_indices_filled.csv"
+ICEBERG_PATH = "data/district_iceberg_indices_filled.csv"
+GEOJSON_PATH = "data/india_districts_filled.geojson"
 CENSUS_PATH = "data/india.csv"
 
 def load_data():
     """
-    Load and merge Iceberg Index data with Census demographics.
+    Load pre-filled Iceberg Index data (with coordinates) and Census demographics.
     Returns:
         df: Merged DataFrame
         stats: Dictionary of summary statistics
     """
-    # 1. Load Iceberg Data
+    # 1. Load Iceberg Data (Filled)
     if not os.path.exists(ICEBERG_PATH):
         raise FileNotFoundError(f"Iceberg Index file not found at {ICEBERG_PATH}")
     
-    df_iceberg = pd.read_csv(ICEBERG_PATH)
+    df = pd.read_csv(ICEBERG_PATH)
     
-    # 2. Load Census Data
+    # Map columns to expected names for UI
+    # Filled CSV has: District, State, iceberg_index, Latitude, Longitude, Type
+    df = df.rename(columns={
+        'District': 'District_Name',
+        'State': 'State_Name'
+    })
+    
+    # 2. Load Census Data (Optional merge for extra metrics)
+    # We kept logic to load census, but we don't need it for Lat/Long anymore as df has it.
     if os.path.exists(CENSUS_PATH):
-        df_census = pd.read_csv(CENSUS_PATH)
-        # Normalize names for merging
-        df_census['District_Clean'] = df_census['District'].str.lower().str.strip()
-        df_census['State_Clean'] = df_census['State'].str.lower().str.strip()
-        
-        df_iceberg['District_Clean'] = df_iceberg['District_Name'].str.lower().str.strip()
-        df_iceberg['State_Clean'] = df_iceberg['State_Name'].str.lower().str.strip()
-        
-        # Merge
-        # Note: Merging on District name primarily within State checking might be tricky due to spelling differences.
-        # We will try a left join on District first.
-        df = df_iceberg.merge(
-            df_census[['District_Clean', 'Latitude', 'Longitude', 'Population', 'literacy_rate', 'Workers', 'Agricultural_Workers']], 
-            on='District_Clean', 
-            how='left'
-        )
-    else:
-        df = df_iceberg
-        # Create placeholder cols if census missing
-        for col in ['Latitude', 'Longitude', 'Population', 'literacy_rate']:
-            df[col] = np.nan
+        try:
+            df_census = pd.read_csv(CENSUS_PATH)
+            # Normalize names for merging
+            df_census['District_Clean'] = df_census['District'].str.lower().str.strip()
+            df['District_Clean'] = df['District_Name'].str.lower().str.strip()
+            
+            # Merge left (keep all filled districts)
+            # Only bring in metrics, NOT lat/long
+            merged = df.merge(
+                df_census[['District_Clean', 'Population', 'literacy_rate', 'Workers', 'Agricultural_Workers', 'Households_with_Internet']], 
+                on='District_Clean', 
+                how='left'
+            )
+            df = merged
+        except Exception as e:
+            print(f"Warning: Census merge failed: {e}")
+            # Continue with just iceberg data
 
     # 3. Calculate National Stats based on loaded data
-    # Correcting scale: The input total_employment seems to be off by factor of 1000 (390B vs 390M expected)
-    df['total_employment'] = df['total_employment'] / 1000
+    # Create valid total_employment for visualization sizing
+    # If merged with census, we have 'Workers'. Use that if total_employment is missing.
+    if 'total_employment' not in df.columns or df['total_employment'].sum() <= len(df): # Check if it's just the dummy 1s
+        if 'Workers' in df.columns:
+            df['total_employment'] = df['Workers']
+        else:
+            df['total_employment'] = 1000 # Default dummy
+            
+            
+    # Scaling for display (Millions) is handled in UI usually, but let's keep raw here.
+    df['total_employment'] = df['total_employment'].fillna(0)
+    
+    # Fix Scale Issue: Input seems to be in thousands (e.g. 142M for a district).
+    # Census Workers is usually ~100k-1M per district.
+    # We detect if mean is too high (> 10M) and scale down.
+    if df['total_employment'].mean() > 10_000_000:
+        df['total_employment'] = df['total_employment'] / 1000
+
     total_employment = df['total_employment'].sum()
     
     # Weighted average of Iceberg Index
@@ -66,3 +88,12 @@ def load_data():
     }
     
     return df, stats
+
+def load_geojson():
+    """Lengths the GeoJSON file for the interactive map."""
+    import json
+    if not os.path.exists(GEOJSON_PATH):
+        return None
+    with open(GEOJSON_PATH, 'r') as f:
+        geojson = json.load(f)
+    return geojson
