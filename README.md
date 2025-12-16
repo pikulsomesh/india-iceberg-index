@@ -8,8 +8,8 @@ This repository serves as the deployment source for the [interactive Streamlit a
 
 ## Research & Methodology
 
-This work adapts the "Iceberg Index" methodology (originally developed by Felten et al.) to the Indian context. We answer:
 *   *Which districts in India have the highest concentration of AI-exposed wages?*
+This work adapts the "Iceberg Index" methodology (originally developed by [Chopra et al.](https://arxiv.org/pdf/2510.25137)) to the Indian context. We answer questions like:
 *   *What percentage of employment is structurally exposed to Generative AI?*
 
 We achieve this by combining:
