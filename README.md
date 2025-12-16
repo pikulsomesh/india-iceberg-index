@@ -7,9 +7,8 @@ While traditional metrics often focus on the "surface" of AI adoption (like the 
 This repository serves as the deployment source for the [interactive Streamlit application](https://india-iceberg-index.streamlit.app/) (link placeholder) and hosts the technical documentation for the project.
 
 ## Research & Methodology
-
-*   *Which districts in India have the highest concentration of AI-exposed wages?*
 This work adapts the "Iceberg Index" methodology (originally developed by [Chopra et al.](https://arxiv.org/pdf/2510.25137)) to the Indian context. We answer questions like:
+*   *Which districts in India have the highest concentration of AI-exposed wages?*
 *   *What percentage of employment is structurally exposed to Generative AI?*
 
 We achieve this by combining:
